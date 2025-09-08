@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -217,6 +218,27 @@ func (e *Employee) Promote(newPosition string) {
 	e.Position = newPosition
 }
 
+/** 锁机制  并发线程------------------------**/
+// Counter 结构体，包含一个互斥锁和一个计数器
+type Counter struct {
+	mu    sync.Mutex
+	count int
+}
+
+// Increment 方法使用互斥锁保护计数器递增操作
+func (c *Counter) Increment() {
+	c.mu.Lock()         // 获取锁
+	defer c.mu.Unlock() // 确保在函数返回时释放锁
+	c.count++           // 递增计数器
+}
+
+// Value 方法返回当前计数器的值
+func (c *Counter) Value() int {
+	c.mu.Lock()         // 获取锁
+	defer c.mu.Unlock() // 确保在函数返回时释放锁
+	return c.count      // 返回计数器值
+}
+
 func main() {
 	// 声明一个整数变量
 	/*num := 5
@@ -344,4 +366,115 @@ func main() {
 
 	// 演示直接访问嵌入字段
 	fmt.Printf("员工 %s 的年龄是 %d 岁\n", emp2.Name, emp2.Age)
+
+	/**-------------------------------------------通道相关的习题=----------------------------------------------**/
+	// 创建一个整数通道
+	ch := make(chan int)
+
+	// 启动发送协程
+	go func() {
+		for i := 1; i <= 10; i++ {
+			ch <- i // 将整数i发送到通道
+		}
+		close(ch) // 发送完成后关闭通道
+	}()
+
+	// 在主协程中接收并打印数据
+	for num := range ch {
+		fmt.Println(num)
+	}
+
+	/** --------------------------------------------通道的接收与输出--------------------------------**/
+	// 创建一个缓冲大小为10的整数通道
+	/*	ch1 := make(chan int, 10)
+
+		// 使用WaitGroup等待两个协程完成
+		var wg sync.WaitGroup
+		wg.Add(2) // 等待两个协程完成
+
+		// 生产者协程：发送100个整数到通道
+		go func() {
+			defer wg.Done()  // 协程结束时通知WaitGroup
+			defer close(ch1) // 发送完成后关闭通道
+
+			for i := 1; i <= 100; i++ {
+				ch1 <- i
+				fmt.Printf("生产者发送: %d\n", i)
+			}
+			fmt.Println("生产者完成")
+		}()
+
+		// 消费者协程：从通道接收并打印整数
+		go func() {
+			defer wg.Done() // 协程结束时通知WaitGroup
+
+			for num := range ch1 {
+				fmt.Printf("消费者接收: %d\n", num)
+			}
+			fmt.Println("消费者完成")
+		}()
+
+		// 等待两个协程完成
+		wg.Wait()
+		fmt.Println("程序结束")
+	*/
+	/**----------------------------  ***/
+	// 创建计数器实例
+	/*var counter Counter
+
+	// 使用WaitGroup等待所有协程完成
+	var wg sync.WaitGroup
+
+	// 启动10个协程
+	for i := 0; i < 10; i++ {
+		wg.Add(1) // 增加WaitGroup计数器
+
+		go func(id int) {
+			defer wg.Done() // 协程完成时减少WaitGroup计数器
+
+			// 每个协程对计数器进行1000次递增操作
+			for j := 0; j < 1000; j++ {
+				counter.Increment()
+			}
+
+			fmt.Printf("协程 %d 完成\n", id)
+		}(i)
+	}
+
+	// 等待所有协程完成
+	wg.Wait()
+
+	// 输出最终的计数器值
+	fmt.Printf("最终计数器值: %d\n", counter.Value())*/
+
+	/** --------------------------------------------------------**/
+	// 使用int64类型的原子计数器
+	var counter int64
+
+	// 使用WaitGroup等待所有协程完成
+	var wg sync.WaitGroup
+
+	// 启动10个协程
+	for i := 0; i < 10; i++ {
+		wg.Add(1) // 增加WaitGroup计数器
+
+		go func(id int) {
+			defer wg.Done() // 协程完成时减少WaitGroup计数器
+
+			// 每个协程对计数器进行1000次递增操作
+			for j := 0; j < 1000; j++ {
+				// 使用原子操作递增计数器
+				atomic.AddInt64(&counter, 1)
+			}
+
+			fmt.Printf("协程 %d 完成\n", id)
+		}(i)
+	}
+
+	// 等待所有协程完成
+	wg.Wait()
+
+	// 使用原子操作读取计数器的值
+	finalValue := atomic.LoadInt64(&counter)
+	fmt.Printf("最终计数器值: %d\n", finalValue)
 }
